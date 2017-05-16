@@ -1,0 +1,7 @@
+# Minimal storm configuration
+storm.zookeeper.servers:
+     - "{{ master_ip }}"
+
+storm.local.dir: "/var/storm"
+
+nimbus.seeds: ["{{ master_ip }}"]

@@ -1,0 +1,120 @@
+---
+- hosts: all
+  gather_facts: False
+  become: yes
+  become_method: sudo
+  remote_user: ubuntu
+  tasks:
+  - name: install python 2
+    raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
+
+- hosts: all
+  become: yes
+  become_method: sudo
+  remote_user: ubuntu
+  tasks:
+  - name: upgrade base packages
+    apt:
+      upgrade: dist
+      update_cache: yes
+  - name: accept license
+    shell: >
+      echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | /usr/bin/debconf-set-selections
+  - name: add java repo
+    apt_repository:
+      repo: 'ppa:webupd8team/java'
+  - name: install oracle java
+    apt:
+      name: oracle-java8-installer 
+      update_cache: yes
+  - name: install supervisor 
+    apt:
+      name: supervisor 
+
+- hosts: stormmaster
+  become: yes
+  become_method: sudo
+  remote_user: ubuntu
+  tasks:
+  - name: Create zookeeper directories
+    file: 
+      path=/var/zookeeper state=directory
+  - name: Create zookeeper directories
+    file: 
+      path=/usr/local/zookeeper state=directory
+  - name: download zookeeper 
+    unarchive:
+      src: http://apache.rediris.es/zookeeper/stable/zookeeper-3.4.10.tar.gz
+      dest: /usr/local/zookeeper
+      remote_src: yes
+  - name: configure storm
+    copy:
+      src: templates/zoo.cfg 
+      dest: /usr/local/zookeeper/zookeeper-3.4.10/conf/zoo.cfg
+  - name: configure storm supervisor
+    copy:
+      src: templates/zoo-supervisor.cfg 
+      dest: /etc/supervisor/conf.d/zoo-supervisor.conf
+  - name: reload supervisord
+    shell: >
+      supervisorctl reload
+  
+- hosts: all
+  become: yes
+  become_method: sudo
+  remote_user: ubuntu
+  tasks: 
+  - name: Create storm directories
+    file: 
+      path=/var/storm state=directory
+  - name: Create storm directories
+    file: 
+      path=/usr/local/storm state=directory
+  - name: download storm
+    unarchive:
+      src: http://apache.rediris.es/storm/apache-storm-1.1.0/apache-storm-1.1.0.tar.gz
+      dest: /usr/local/storm
+      remote_src: yes
+  - name: configure storm 
+    template:
+      src: templates/storm.yaml.j2
+      dest: /usr/local/storm/apache-storm-1.1.0/conf/storm.yaml
+
+- hosts: stormmaster
+  become: yes
+  become_method: sudo
+  remote_user: ubuntu
+  tasks:
+  - name: configure nimbus supervisor
+    copy:
+      src: templates/nimbus-supervisor.cfg 
+      dest: /etc/supervisor/conf.d/nimbus-supervisor.conf
+  - name: reload supervisord
+    shell: >
+      supervisorctl reload
+  - name: add cassandra repo
+    apt_repository:
+      repo: deb http://www.apache.org/dist/cassandra/debian 36x main
+      state: present
+      filename: 'cassandra'
+  - name: cassandra repo key
+    apt_key:
+      url: https://www.apache.org/dist/cassandra/KEYS
+      state: present
+  - name: install cassandra
+    apt:
+      name: cassandra
+      update_cache: yes
+ 
+- hosts: all 
+  become: yes
+  become_method: sudo
+  remote_user: ubuntu
+  tasks:
+  - name: configure storm supervisor
+    copy:
+      src: templates/storm-supervisor.cfg 
+      dest: /etc/supervisor/conf.d/storm-supervisor.conf
+  - name: reload supervisord
+    shell: >
+      supervisorctl reload
